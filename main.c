@@ -1,32 +1,34 @@
 #include "STC32G.h"
 
-//���峣����������
+//主频35Mhz，使用spi0与tft屏幕相连接
+
+//定义常用数据类型
 #define uint8_t unsigned char
 #define uint16_t unsigned int
 #define uint32_t unsigned long
 
-// tft���������
-#define SWRESET   0x01  // ������λ
-#define SLPOUT    0x11  // �˳�˯��ģʽ
-#define COLMOD    0x3A  // ������ɫ��ʽ
-#define MADCTL    0x36  // �Դ���ʷ������
-#define CASET     0x2A  // �е�ַ����
-#define RASET     0x2B  // �е�ַ����
-#define DISPON    0x29  // ������ʾ
+// tft常用命令定义
+#define SWRESET   0x01  // 软件复位
+#define SLPOUT    0x11  // 退出睡眠模式
+#define COLMOD    0x3A  // 设置颜色格式
+#define MADCTL    0x36  // 显存访问方向控制
+#define CASET     0x2A  // 列地址设置
+#define RASET     0x2B  // 行地址设置
+#define DISPON    0x29  // 开启显示
 
 
-// tft������ɫ
+// tft常用颜色
 #define RED     0xF800
 #define GREEN   0x07E0
 #define BLUE    0x001F
 #define WHITE   0xFFFF
 #define BLACK   0x0000
 
-//����tft��Ļ��������
+//定义tft屏幕接线引脚
 sbit LCD_DC=P0^1;
 sbit LCD_RST=P0^0;
 
-/*---------------������ʱ--------------*/
+/*---------------软件延时--------------*/
 void Delay20ms(void)	//@35.000MHz
 {
 	unsigned long edata i;
@@ -50,24 +52,24 @@ void Delay200ms(void)	//@35.000MHz
 
 
 
-/*---------------�����ͨѶ-------------*/
+/*---------------与电脑通讯-------------*/
 
-//uart��ʼ������
-/*���ò�����
+//uart初始化函数
+/*可用波特率
 972200
 
 
 */
 void Uart1_Init(void)	//972200bps@35.000MHz
 {
-	SCON = 0x50;		//8λ����,�ɱ䲨����
-	AUXR |= 0x40;		//��ʱ��ʱ��1Tģʽ
-	AUXR &= 0xFE;		//����1ѡ��ʱ��1Ϊ�����ʷ�����
-	TMOD &= 0x0F;		//���ö�ʱ��ģʽ
-	TL1 = 0xF7;			//���ö�ʱ��ʼֵ
-	TH1 = 0xFF;			//���ö�ʱ��ʼֵ
-	ET1 = 0;			//��ֹ��ʱ���ж�
-	TR1 = 1;			//��ʱ��1��ʼ��ʱ
+	SCON = 0x50;		//8位数据,可变波特率
+	AUXR |= 0x40;		//定时器时钟1T模式
+	AUXR &= 0xFE;		//串口1选择定时器1为波特率发生器
+	TMOD &= 0x0F;		//设置定时器模式
+	TL1 = 0xF7;			//设置定时初始值
+	TH1 = 0xFF;			//设置定时初始值
+	ET1 = 0;			//禁止定时器中断
+	TR1 = 1;			//定时器1开始计时
 }
 
 
@@ -89,7 +91,7 @@ void Uart_Write(uint8_t str){
 	TI=0;
 }
 /*
-//uart�жϺ���
+//uart中断函数
 
 void	UartItrpt() interrupt 4
 {
@@ -100,14 +102,14 @@ void	UartItrpt() interrupt 4
 }
 */
 
-/*---------------����ĻͨѶ-------------*/
+/*---------------与屏幕通讯-------------*/
 
 
-/*---------------spi����---------------*/
+/*---------------spi函数---------------*/
 void SPI_Init(){
 	P_SW1&=0xf3;
 	/*
-	һϵ������
+	一系列配置
 	SSIG=1
 	SPEN=1
 	DORD=0
@@ -118,10 +120,10 @@ void SPI_Init(){
 	*/
 	SPCTL=0xDF;
 	
-	SPSTAT=0xc0;//��ձ�־
-	ESPI=0;//����SPI�ж�
+	SPSTAT=0xc0;//清空标志
+	ESPI=0;//禁用SPI中断
 	
-	//���ø���spi
+	//配置高速spi
 	CLKSEL|=0x80;
 	USBCLK|=0x80;
 	Delay200ms();
@@ -138,36 +140,36 @@ void SPI_Isr() interrupt 9
 }
 */
 
-/*-------------��Ļ����-----------*/
+/*-------------屏幕函数-----------*/
 
 
-//д������
+//写入命令
 void LCD_WriteCmd(uint8_t cmd){
-	LCD_DC=0;//����ģʽ
-	SPDAT=cmd;//д��
-	while(!SPIF);//�ȴ�������д��
-	SPIF=1;//�����־
+	LCD_DC=0;//命令模式
+	SPDAT=cmd;//写入
+	while(!SPIF);//等待到命令写完
+	SPIF=1;//清除标志
 }
 
-//д������
+//写入数据
 void LCD_WriteData(uint8_t cmd){
-	LCD_DC=1;//����ģʽ
-	SPDAT=cmd;//д��
-	while(!SPIF);//�ȴ�������д��
-	SPIF=1;//�����־
+	LCD_DC=1;//数据模式
+	SPDAT=cmd;//写入
+	while(!SPIF);//等待到命令写完
+	SPIF=1;//清除标志
 }
 
-//д16λ��ɫ���ݣ�RGB565��
+//写16位颜色数据（RGB565）
 void LCD_WriteColor(uint16_t color){
-	LCD_WriteData(color >>8);	//���ֽ�
-	LCD_WriteData(color);			//���ֽ�
+	LCD_WriteData(color >>8);	//高字节
+	LCD_WriteData(color);			//低字节
 }
 
-//������ʾ����
+//设置显示窗口
 void SetWindow(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1) {
 		x0+=2;
 		x1+=2;
-		y0+=3;//�Ҳ�֪��Ϊʲô��������������ƫ�ƣ��������Ǻ��õģ�����
+		y0+=3;//我不知道为什么坐标会出现这样的偏移，但这样是好用的（大雾
 		y1+=3;
     LCD_WriteCmd(CASET);
     LCD_WriteData(0x00); LCD_WriteData(x0);
@@ -177,65 +179,65 @@ void SetWindow(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1) {
     LCD_WriteData(0x00); LCD_WriteData(y0);
     LCD_WriteData(0x00); LCD_WriteData(y1);
     
-    LCD_WriteCmd(0x2C);  // �Դ�д������
+    LCD_WriteCmd(0x2C);  // 显存写入命令
 }
 
-// ȫ�������ɫ
+// 全屏填充颜色
 void LCD_FillScreen(uint16_t color) {
 		uint32_t total = 128 * 128;
     SetWindow(0, 0, 127, 127);
     
-    LCD_DC = 1;  // ��������ģʽ
+    LCD_DC = 1;  // 进入数据模式
     
     
     while(total--) {
         LCD_WriteColor(color);
     }
 }
-//��Ļ��ʼ��
+//屏幕初始化
 void LCD_Init() {
-    // Ӳ����λ
+    // 硬件复位
     LCD_RST=0;
     Delay20ms();
     LCD_RST=1;
     Delay20ms();
-    // ������ʼ������
+    // 软件初始化序列
     LCD_WriteCmd(SWRESET); Delay20ms();
-    LCD_WriteCmd(SLPOUT);  Delay200ms();  // ������ʱ>120ms
+    LCD_WriteCmd(SLPOUT);  Delay200ms();  // 必须延时>120ms
     
-    // ����16λɫRGB565
+    // 设置16位色RGB565
     LCD_WriteCmd(COLMOD);
     LCD_WriteData(0x05);  // 0x05=16bit/pixel
     
-    // �Դ���ʷ��򣨲����ɵ�����ת����
+    // 显存访问方向（参数可调整旋转方向）
     LCD_WriteCmd(MADCTL);
-    /* ����˵��������ֵ����
-     * 0xA0: ������ʾ (0��)
-     * 0x60: ������ʾ (90��)
-     * 0xC0: ����ת(180��)
-     * 0x00: ����ת(270��)
+    /* 参数说明（常用值）：
+     * 0xA0: 横向显示 (0°)
+     * 0x60: 竖向显示 (90°)
+     * 0xC0: 横向翻转(180°)
+     * 0x00: 竖向翻转(270°)
      */
-    LCD_WriteData(0xC0|0x08);//|0x08������RGB��ʽ
+    LCD_WriteData(0xC0|0x08);//|0x08是设置RGB格式
     
-    // ������ʾ����128x128ȫ����
+    // 设置显示区域（128x128全屏）
     SetWindow(0, 0, 127, 127);
     
-    // ������ʾ
+    // 开启显示
     LCD_WriteCmd(DISPON);
     //Delay200ms();
 }
 void main(){
-	//spiҪ��
+	//spi要求
 	P1M0 |= 0x28;  // 0011 1000
 	P1M1 &= 0x00; // 1100 0111
-	//uartҪ��
+	//uart要求
 	P3M0 = 0x00; P3M1 = 0x00; 
-	//��Ļ��res&dcҪ��
+	//屏幕的res&dc要求
 	P0M0 = 0x00; P0M1 = 0x00; 
-	//Ӳ����ʼ��
+	//硬件初始化
 	Uart1_Init();
 	SPI_Init();
-	//��Ļ��ʼ��
+	//屏幕初始化
 	LCD_Init();
 	Uart_Write(0x88);
 	
@@ -243,7 +245,7 @@ void main(){
 	
 	SetWindow(0,0,85,47);
 	
-	LCD_DC=1;//��Ļ��������ģʽ
+	LCD_DC=1;//屏幕进入数据模式
 	
 	
 	while(1){
@@ -252,5 +254,6 @@ void main(){
 	
 	
 }
+
 
 
