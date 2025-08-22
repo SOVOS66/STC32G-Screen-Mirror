@@ -1,6 +1,6 @@
 # FIle Explanation
-- main.c file should be flashed onto STC32G
-- main.py file running on the computer side
+- main.c      File should be flashed onto STC32G
+- main.py     File running on the computer side
 
 # Principle Explanation
 
