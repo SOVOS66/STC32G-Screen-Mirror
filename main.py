@@ -6,7 +6,7 @@ import cv2
 import time
 
 def main():
-    # 初始化串口 (调整波特率以适应实际硬件)
+    # 初始化串口，串口要调整为自己电脑上的串口
     ser = serial.Serial('COM5', baudrate=972200, timeout=0.1)
     time.sleep(5)
     # 获取屏幕尺寸
@@ -47,4 +47,5 @@ if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
+
         print("程序终止")
